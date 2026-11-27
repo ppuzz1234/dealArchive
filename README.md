@@ -1,113 +1,80 @@
 # DealArchive
 
-> PLUS Private Room(hpr) 저장소를 그대로 이관해 시작한 프로젝트입니다. 아래 화면·여정 설명은 원본 기준입니다.
+PLUS 소싱 매트릭스(Google Sheet)로 관리하던 딜 리스트를 **BI형 아카이브 + 신규 딜 심사(투표·Q&A) + 글로벌 딜 피드**로 옮긴 사내 도구입니다.
 
-> B2B 폐쇄형 멀티패밀리오피스(Multi-Family Office) 플랫폼
-> 법인의 잉여현금(FCF)을 **진단 → 비히클 설립 → 한화 밸류체인 대체투자**로 잇는 올인원 여정
+React(Vite) 프론트엔드 + Node.js(Express) API 모노레포. DB는 로컬에서는 설치 없이 동작하는 내장 Postgres(PGlite),
+운영에서는 Supabase Postgres를 같은 SQL로 사용합니다.
 
-React(Vite) 프론트엔드 + Node.js(Express) 백엔드 모노레포. AIM 앱 톤앤매너(딥 네이비 + 민트 시안),
-iPhone 17 Pro 기준 모바일 UI, 디바이스 시뮬레이터 진입 경로 포함.
+## 기능
 
-## 모노레포 구조
+| 메뉴 | 내용 |
+|------|------|
+| **대시보드** | KPI · 분류별 딜 맵(트리맵, 면적=딜 수/색=합의 등급) · 분류별 등급 분포 · 분류×6대 지표 히트맵 · 지역/담당자별 · 상위 평가 딜 · 최근 활동. 모든 차트는 클릭 드릴다운 · hover 툴팁 · '표로 보기' 지원 |
+| **딜 아카이브** | 대분류 › 소분류 › 개별 딜 드릴다운(분류 트리 + 트리맵), 검색·등급·지역·담당자·상태 필터, 카드/표 보기. 필터 상태는 URL에 남아 링크로 공유 가능 |
+| **딜 상세** | 상품 설명 · 국내외 사례 · 리스크 · 핵심 조건, **육각형 6대 지표**(같은 분류 평균과 비교), **등급 투표**(A/B+/B/C, 1인 1표), **Q&A**(누구나 질문 → 딜 담당자 답변), 첨부파일, **유사 딜** 추천 |
+| **딜 등록** | 이력서처럼 정해진 항목(기본 정보 → 개요 → 사례·조건 → 리스크 → 평가 → 첨부)을 채우면 구조화 데이터로 저장. 등록 시 '심사중' 상태 |
+| **심사 보드** | 심사중 딜의 투표 진행률 · 합의 등급 · 내 투표 대기 · 내 딜의 미답변 질문 |
+| **글로벌 딜 피드** | 해외 딜·대체투자·금융 사례를 링크·요약으로 스크랩하고 아카이브 딜과 연결 (자동 수집은 추후) |
+| **담당자** | 로그인 없이 이름을 골라 사용(오른쪽 위). 권한·SSO는 이후 단계 |
 
-```
-DealArchive/
-├── package.json          # npm workspaces + 통합 스크립트
-├── frontend/             # React 18 + Vite + react-router
-│   ├── index.html
-│   ├── vite.config.js    # dev:4699, /api → :4700 프록시
-│   └── src/
-│       ├── main.jsx / App.jsx
-│       ├── styles.css            # 디자인 시스템 + 모바일 셸 + 디바이스 프레임
-│       ├── data.js               # 목업 데이터 (→ 향후 api.js 로 교체)
-│       ├── api.js                # 백엔드 호출 헬퍼 (스텁)
-│       ├── utils.js              # 포맷·내비 설정
-│       ├── context/AppContext.jsx
-│       ├── components/           # Layout · Sidebar · Topbar · StatusBar
-│       │                         # BottomNav · Toasts · Modal · DeviceFrame · Charts
-│       └── screens/              # Home · Step1 · Step2 · Step3 · Dual · Bridge · Singapore
-└── backend/              # Node.js + Express (API 스캐폴드)
-    ├── .env.example
-    └── src/
-        ├── index.js              # 서버 엔트리 (:4700)
-        ├── mockData.js
-        └── routes/               # diagnose · advisors · deals · portfolio · singapore
-```
+### 데이터 기준
+- **분류 체계·6대 지표·등급 정의**: [backend/src/taxonomy.js](backend/src/taxonomy.js) — 대분류/소분류 추가는 이 파일만 수정
+- **6대 지표**: 기대수익 · 안정성 · 유동성 · 실행가능성 · 고객매력도 · 그룹 시너지 (1~5점)
+- **등급**: 시트의 '우선순위'와 동일한 A / B+ / B / C. 합의 등급 = 투표 평균(A=4, B+=3, B=2, C=1)을 가장 가까운 등급으로 환산
+- **초기 데이터**: 시트 34건 이관 — [backend/db/seed-data.js](backend/db/seed-data.js). 시트의 우선순위는 담당자 본인의 투표로 이관(TBD는 미투표).
+  6대 지표는 시트 내용을 근거로 한 **초기 추정치**이며 화면에 '추정치' 배지가 붙고, 담당자가 편집하면 확정값이 됩니다.
+- **유사 딜**: 같은 소분류/대분류 + 6대 지표 거리 + 지역 + 비히클 가중합 ([backend/src/lib/similarity.js](backend/src/lib/similarity.js))
 
 ## 빠른 시작
 
 ```bash
-# 1) 의존성 설치 (루트에서 workspaces 일괄 설치)
 npm install
-
-# 2) 프론트 + 백엔드 동시 실행
 npm run dev
 #   프론트: http://localhost:4699
 #   API:    http://localhost:4700/api/health
-
-# 개별 실행
-npm run dev:web      # 프론트만
-npm run dev:api      # 백엔드만
 ```
 
-### 진입 경로 (2개)
-| URL | 설명 |
-|-----|------|
-| `http://localhost:4699/` | 앱 본체 (반응형 · iPhone 17 Pro 기준 모바일 UI) |
-| `http://localhost:4699/device` | iPhone 17 Pro 디바이스 시뮬레이터(티타늄 프레임 + 다이내믹 아일랜드) 래퍼 |
+`DATABASE_URL`이 비어 있으면 `backend/.data/pglite`에 내장 DB가 만들어지고, 처음 기동할 때 시트 34건이 자동으로 시드됩니다.
 
-> 모바일 셸(≤480px)에서는 iOS 상태바 + 하단 탭바로, 데스크톱에서는 사이드바 레이아웃으로 자동 전환됩니다.
+```bash
+npm run db:setup -w backend   # 스키마만 적용
+npm run db:seed  -w backend   # 스키마 + (비어 있으면) 시드
+npm run db:reset -w backend   # 전체 삭제 후 재시드 (주의: 데이터 삭제, API 서버를 먼저 끌 것)
+```
 
-## 화면 / 여정
+## 구조
 
-| 단계 | 내용 |
-|------|------|
-| **STEP 1** | 재무제표 업로드 → 30초 FCF 스캔 → ROIC 정체구간·기회비용 → 1-Page Executive Summary |
-| **STEP 1.1** | Cathie Wood / Ray Dalio / Warren Buffett 관점 선택 → 컨설팅 채팅 |
-| **STEP 2** | 디지털 가족신탁 · Family LLC 빌더 · 스트레스 테스트 · 외환/세무 에뮬레이터 |
-| **STEP 3** | Tranching 공급망 · 클럽딜 서명 · Fund of Funds 실시간 대시보드 |
-| **코어 모듈** | 메인-승계 듀얼 시뮬레이터 · 글로벌 자산이전 브릿지 · 싱가포르 라이선스 허브 |
+```
+DealArchive/
+├── frontend/src/
+│   ├── App.jsx · context.jsx · api.js · lib.js · styles.css
+│   ├── components/   Shell(사이드바·담당자 선택) · charts(트리맵·레이더·누적바·히트맵) · ui
+│   └── screens/      Dashboard · Explorer · DealDetail · DealForm · Review · Feed · People
+└── backend/
+    ├── db/           schema.sql · seed-data.js · setup.js
+    └── src/          index.js · db.js(pg/PGlite) · bootstrap.js · taxonomy.js · routes/ · lib/
+```
 
-## 백엔드 API (스캐폴드)
-
-현재는 목업 응답. 프론트는 `src/data.js`를 사용하며, 백엔드 연동 시 `src/api.js` 헬퍼로 교체합니다.
+## API
 
 | 메서드 | 엔드포인트 | 용도 |
 |--------|-----------|------|
-| GET  | `/api/health` | 헬스체크 |
-| POST | `/api/diagnose` | 재무 진단 (→ 향후 OCR·평가엔진) |
-| GET  | `/api/advisors` | 어드바이저 목록 |
-| POST | `/api/advisors/:id/consult` | 컨설팅 (→ 향후 Claude API) |
-| GET  | `/api/deals/tranches` · `/api/deals/club` | 딜 공급망 |
-| POST | `/api/deals/commit` | 출자확약 (→ 향후 전자서명·캐피탈 콜) |
-| GET  | `/api/portfolio` | Fund of Funds 대시보드 |
-| GET  | `/api/singapore/licenses` | 13O/13U/VCC 자격 |
+| GET | `/api/meta` | 분류 체계 · 지표 · 등급 · 지역 |
+| GET/POST | `/api/users` | 담당자 목록 / 추가 |
+| GET/POST | `/api/deals` | 딜 목록(투표 집계 포함) / 신규 등록 |
+| GET/PUT/DELETE | `/api/deals/:id` | 상세(투표·Q&A·첨부·유사 딜) / 수정 / 삭제(담당자만) |
+| PUT/DELETE | `/api/deals/:id/vote` | 등급 투표 / 취소 |
+| POST | `/api/deals/:id/questions` · `/api/questions/:qid/answers` | 질문 / 답변(딜 담당자만) |
+| POST · GET · DELETE | `/api/deals/:id/attachments` · `/api/attachments/:aid` | 첨부 업로드(15MB) / 다운로드 / 삭제 |
+| GET | `/api/activity` | 최근 활동 |
+| GET/POST/PUT/DELETE | `/api/feed` | 글로벌 딜 피드 |
 
-`.env` 설정: `backend/.env.example` 복사 → `backend/.env`
+쓰기 요청은 `X-User-Id` 헤더(화면에서 고른 담당자)를 사용합니다. 로그인 도입 시 이 부분을 세션으로 교체합니다.
 
-## 빌드 / 배포
+## 배포
 
-```bash
-npm run build          # frontend/dist 생성
-npm run preview        # 빌드 결과 미리보기 (SPA 라우팅 지원)
-npm run start:api      # 프로덕션 API 실행
-```
-
-## 향후 (production 전환)
-- `data.js` 목업 → 백엔드 API(`api.js`) 연동
-- 재무 OCR · 기업가치 평가엔진 · Tranching API
-- AI 웰스 어드바이저 → Claude API
-- 전자서명 / 캐피탈 콜 → KYC·전자계약·자본집행 인프라
-- 폐쇄형 가문 인증(상위 0.1% 초청제) · 종단간 암호화
-
-> 데모용 수치·기관명·딜은 가상 데이터입니다.
-
-## DB (Postgres)
-
-```bash
-docker compose up -d     # 로컬 Postgres (dealarchive/dealarchive@localhost:5432/dealarchive)
-npm run db:setup -w backend   # backend/db/schema.sql 적용
-npm run db:seed  -w backend   # 시드 데이터
-```
-
-`backend/.env` 의 `DATABASE_URL` 로 대상 DB를 지정합니다. hpr 과 같은 Supabase 프로젝트를 가리키면 스키마가 덮어써지므로 별도 DB를 사용하세요.
+- 백엔드: `main` push → GitHub Actions가 이미지 빌드(ghcr.io) → NAS Watchtower 자동 교체 ([deploy/nas/README.md](deploy/nas/README.md))
+- 운영 DB: `backend.env`의 `DATABASE_URL`에 Supabase 연결 문자열 지정. 기동 시 스키마가 자동 적용되고, 딜 테이블이 비어 있으면 시드됩니다.
+  (운영에서 `DATABASE_URL`을 비우면 컨테이너 내부 PGlite를 쓰므로 컨테이너 교체 시 데이터가 사라집니다)
+- 프론트: `npm run build` → `frontend/dist`. API가 다른 도메인이면 빌드 시 `VITE_API_BASE=https://api.도메인/api` 지정,
+  백엔드 `CORS_ORIGIN`에 프론트 도메인을 넣습니다(쉼표로 여러 개).

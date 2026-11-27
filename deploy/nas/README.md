@@ -24,8 +24,7 @@ File Station으로 `deploy/nas/` 폴더의 파일만 NAS에 복사 (예: `/volum
 
 ## 2. 환경변수 작성
 `backend.env.example` → 같은 위치에 `backend.env` 로 복사 후 실제 값 입력.
-- JWT_SECRET은 운영용으로 새로 생성 (예시 파일 내 명령 참고)
-- GOOGLE_CALLBACK_URL의 도메인을 실제 도메인으로
+- DATABASE_URL에 Supabase 연결 문자열, CORS_ORIGIN에 프론트 도메인 입력 (로그인/OAuth 설정은 현재 없음)
 
 ## 3. 이미지 저장소(ghcr) 접근 설정
 ### 3-1. GitHub 토큰 발급

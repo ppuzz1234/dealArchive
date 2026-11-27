@@ -30,3 +30,6 @@ Thumbs.db
 *.tmp
 coverage/
 .claude/settings.json
+
+# local embedded DB (PGlite)
+backend/.data/

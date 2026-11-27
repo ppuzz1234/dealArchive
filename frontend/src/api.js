@@ -1,36 +1,52 @@
-/* 백엔드 API 헬퍼 (현재 화면은 src/data.js 목업을 사용).
-   백엔드 연동 시 각 화면에서 data.js 대신 아래 함수들을 호출하도록 교체.
-   dev 환경에서는 vite proxy(/api → :4700)로 전달됨. */
-const BASE = import.meta.env.VITE_API_BASE || "/api";
+/* 백엔드 API 헬퍼 — dev는 vite proxy(/api → :4700), 운영은 VITE_API_BASE(예: https://api.도메인/api).
+   로그인 도입 전까지 현재 담당자는 X-User-Id 헤더로 전달한다. */
+export const BASE = import.meta.env.VITE_API_BASE || "/api";
 
-async function req(path, options) {
+let currentUserId = null;
+export const setApiUser = (id) => { currentUserId = id; };
+
+async function req(path, { method = "GET", body, form } = {}) {
+  const headers = {};
+  if (currentUserId) headers["X-User-Id"] = String(currentUserId);
+  if (body !== undefined) headers["Content-Type"] = "application/json";
   const res = await fetch(BASE + path, {
-    headers: { "Content-Type": "application/json" },
-    credentials: "include", // 운영에서 API가 서브도메인(api.도메인)일 때도 세션 쿠키 동봉
-    ...options,
+    method,
+    headers,
+    body: form || (body !== undefined ? JSON.stringify(body) : undefined),
   });
-  if (!res.ok) throw new Error(`API ${res.status} ${path}`);
-  return res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `요청 실패 (${res.status})`);
+  return data;
 }
 
 export const api = {
-  health: () => req("/health"),
-  // 세션 — httpOnly 쿠키 기반. me()는 브라우저 재시작 후 로그인 복원에 사용
-  me: () => req("/auth/me"),
-  logout: () => req("/auth/logout", { method: "POST" }),
-  diagnose: (payload) => req("/diagnose", { method: "POST", body: JSON.stringify(payload || {}) }),
-  advisors: () => req("/advisors"),
-  consult: (id, question) => req(`/advisors/${id}/consult`, { method: "POST", body: JSON.stringify({ question }) }),
-  tranches: () => req("/deals/tranches"),
-  clubDeals: () => req("/deals/club"),
-  commit: (dealId, amount) => req("/deals/commit", { method: "POST", body: JSON.stringify({ dealId, amount }) }),
-  portfolio: () => req("/portfolio"),
-  singaporeLicenses: () => req("/singapore/licenses"),
-  // 온보딩 완료 시 역할 기록 — 다음 로그인부터 온보딩 스킵하고 홈 직행
-  saveRole: (userId, userType) =>
-    req("/users/role", { method: "POST", body: JSON.stringify({ userId, userType }) }),
-  // 개인 LP 포트폴리오 (DB 영속화) — amount는 만원 단위
-  holdings: (userId) => req(`/portfolio/holdings?userId=${encodeURIComponent(userId)}`),
-  invest: (userId, dealSlug, amountMan) =>
-    req("/portfolio/invest", { method: "POST", body: JSON.stringify({ userId, dealSlug, amountMan }) }),
+  meta: () => req("/meta"),
+  users: () => req("/users"),
+  addUser: (name) => req("/users", { method: "POST", body: { name } }),
+
+  deals: (status) => req(`/deals${status ? `?status=${status}` : ""}`),
+  deal: (id) => req(`/deals/${id}`),
+  createDeal: (d) => req("/deals", { method: "POST", body: d }),
+  updateDeal: (id, d) => req(`/deals/${id}`, { method: "PUT", body: d }),
+  deleteDeal: (id) => req(`/deals/${id}`, { method: "DELETE" }),
+
+  vote: (id, grade, comment) => req(`/deals/${id}/vote`, { method: "PUT", body: { grade, comment } }),
+  unvote: (id) => req(`/deals/${id}/vote`, { method: "DELETE" }),
+  ask: (id, body) => req(`/deals/${id}/questions`, { method: "POST", body: { body } }),
+  answer: (qid, body) => req(`/questions/${qid}/answers`, { method: "POST", body: { body } }),
+  deleteQuestion: (qid) => req(`/questions/${qid}`, { method: "DELETE" }),
+
+  upload: (id, files) => {
+    const form = new FormData();
+    for (const f of files) form.append("files", f);
+    return req(`/deals/${id}/attachments`, { method: "POST", form });
+  },
+  fileUrl: (aid) => `${BASE}/attachments/${aid}`,
+  deleteFile: (aid) => req(`/attachments/${aid}`, { method: "DELETE" }),
+
+  activity: (limit = 20) => req(`/activity?limit=${limit}`),
+  feed: () => req("/feed"),
+  addFeed: (d) => req("/feed", { method: "POST", body: d }),
+  updateFeed: (id, d) => req(`/feed/${id}`, { method: "PUT", body: d }),
+  deleteFeed: (id) => req(`/feed/${id}`, { method: "DELETE" }),
 };

@@ -1,36 +1,20 @@
-/* schema.sql을 DATABASE_URL 대상 Postgres에 적용한다.
-   psql CLI 설치 여부와 무관하게 동작하도록 pg 드라이버로 직접 실행. */
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-import "dotenv/config";
-import pg from "pg";
+/* 스키마 적용 / 시드 / 초기화
+   npm run db:setup  -w backend   # 스키마만 적용
+   npm run db:seed   -w backend   # 스키마 + (비어 있으면) 시트 34건 시드
+   npm run db:reset  -w backend   # 모든 테이블 삭제 후 재생성 + 시드 (주의: 데이터 삭제) */
+import { applySchema, resetDb, seedIfEmpty } from "../src/bootstrap.js";
+import { db } from "../src/db.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const args = new Set(process.argv.slice(2));
 
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  console.error("DATABASE_URL이 설정되지 않았습니다. backend/.env에 추가하세요.");
-  process.exit(1);
+if (args.has("--reset")) {
+  await resetDb();
+  console.log("✓ tables dropped");
 }
-
-const schema = readFileSync(path.join(__dirname, "schema.sql"), "utf8");
-
-/* Supabase 등 원격 Postgres는 SSL 필수(자체 CA라 인증서 검증은 생략). 로컬 docker는 SSL 미사용. */
-const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(DATABASE_URL);
-const client = new pg.Client({
-  connectionString: DATABASE_URL,
-  ssl: isLocal ? false : { rejectUnauthorized: false },
-});
-
-try {
-  await client.connect();
-  await client.query(schema);
-  console.log("schema.sql 적용 완료.");
-} catch (err) {
-  const detail = err.errors?.map((e) => e.message).join(", ") || err.message || String(err);
-  console.error("스키마 적용 실패:", detail);
-  process.exitCode = 1;
-} finally {
-  await client.end();
+await applySchema();
+console.log(`✓ schema applied (${db.kind})`);
+if (args.has("--seed")) {
+  const seeded = await seedIfEmpty();
+  console.log(seeded ? "✓ seeded" : "· deals already present — seed skipped");
 }
+process.exit(0);
