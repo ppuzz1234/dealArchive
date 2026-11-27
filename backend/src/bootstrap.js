@@ -14,7 +14,7 @@ export async function applySchema() {
 }
 
 export async function resetDb() {
-  await db.exec(`drop table if exists market_items, attachments, answers, questions, votes, deals, users cascade;`);
+  await db.exec(`drop table if exists schedule_events, market_items, attachments, answers, questions, votes, deals, users cascade;`);
 }
 
 export async function seedIfEmpty({ force = false } = {}) {

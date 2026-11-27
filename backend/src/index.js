@@ -7,6 +7,7 @@ import { bootstrap } from "./bootstrap.js";
 import { db } from "./db.js";
 import deals from "./routes/deals.js";
 import misc from "./routes/misc.js";
+import schedule from "./routes/schedule.js";
 
 const app = express();
 const PORT = process.env.PORT || 4700;
@@ -25,6 +26,7 @@ app.get("/api/health", (_req, res) =>
 );
 
 app.use("/api/deals", deals);
+app.use("/api/schedule", schedule);
 app.use("/api", misc);
 
 app.use((_req, res) => res.status(404).json({ error: "Not Found" }));

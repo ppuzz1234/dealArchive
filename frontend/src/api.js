@@ -34,6 +34,9 @@ export const api = {
   unvote: (id) => req(`/deals/${id}/vote`, { method: "DELETE" }),
   ask: (id, body) => req(`/deals/${id}/questions`, { method: "POST", body: { body } }),
   answer: (qid, body) => req(`/questions/${qid}/answers`, { method: "POST", body: { body } }),
+  editQuestion: (qid, body) => req(`/questions/${qid}`, { method: "PUT", body: { body } }),
+  editAnswer: (aid, body) => req(`/answers/${aid}`, { method: "PUT", body: { body } }),
+  deleteAnswer: (aid) => req(`/answers/${aid}`, { method: "DELETE" }),
   deleteQuestion: (qid) => req(`/questions/${qid}`, { method: "DELETE" }),
 
   upload: (id, files) => {
@@ -43,6 +46,11 @@ export const api = {
   },
   fileUrl: (aid) => `${BASE}/attachments/${aid}`,
   deleteFile: (aid) => req(`/attachments/${aid}`, { method: "DELETE" }),
+
+  schedule: () => req("/schedule"),
+  addSchedule: (d) => req("/schedule", { method: "POST", body: d }),
+  updateSchedule: (id, d) => req(`/schedule/${id}`, { method: "PUT", body: d }),
+  deleteSchedule: (id) => req(`/schedule/${id}`, { method: "DELETE" }),
 
   activity: (limit = 20) => req(`/activity?limit=${limit}`),
   feed: () => req("/feed"),

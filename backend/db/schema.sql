@@ -72,6 +72,10 @@ create table if not exists answers (
   created_at  timestamptz not null default now()
 );
 
+-- 질문·답변 수정 시각(작성자가 수정하면 기록 → 화면에 '수정됨' 표시)
+alter table questions add column if not exists edited_at timestamptz;
+alter table answers   add column if not exists edited_at timestamptz;
+
 -- 첨부파일 — 소규모 팀 사용 기준으로 DB(bytea)에 보관(별도 스토리지 불필요)
 create table if not exists attachments (
   id          serial primary key,
@@ -82,6 +86,18 @@ create table if not exists attachments (
   size        integer not null,
   data        bytea not null,
   created_at  timestamptz not null default now()
+);
+
+-- 일정 — 관리자 메뉴에서 지정하는 딜소싱 마감일(sourcing)·심사일(review). 같은 날 같은 종류는 1건
+create table if not exists schedule_events (
+  id          serial primary key,
+  kind        text not null check (kind in ('sourcing','review')),
+  event_date  date not null,
+  note        text,
+  created_by  integer references users(id),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  unique (kind, event_date)
 );
 
 -- 글로벌 딜·시장 피드 — 담당자 수동 등록

@@ -3,12 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApp } from "../context.jsx";
 import { api } from "../api.js";
-import { avg, consensus, fmtAgo, metricAverages, scoreToGrade } from "../lib.js";
+import { GRADE_IDS, avg, consensus, ddayOf, fmtAgo, fmtDday, fmtMD, gradeVar, metricAverages, parseYmd, scoreToGrade, sourcingNudge, toYmd, upcomingEvent } from "../lib.js";
 import { ChartCard, GradeLegend, GradeStackBars, HBars, Heatmap, SeqLegend, TT, Treemap } from "../components/charts.jsx";
-import { Grade, Loading, Empty } from "../components/ui.jsx";
+import { Avatar, Grade, Loading, Empty } from "../components/ui.jsx";
 
 export default function Dashboard() {
-  const { meta, deals, userId } = useApp();
+  const { meta, deals, schedule, userId } = useApp();
   const nav = useNavigate();
   const [activity, setActivity] = useState([]);
   useEffect(() => { api.activity(12).then(setActivity).catch(() => {}); }, [deals]);
@@ -35,6 +35,7 @@ export default function Dashboard() {
     const top = [...deals].filter((d) => d.avg_score != null).sort((a, b) => b.avg_score - a.avg_score || b.vote_count - a.vote_count).slice(0, 6);
     return {
       byCat, regions, owners, review, top,
+      mix: deals.reduce((m, d) => { m[consensus(d) || "none"] += 1; return m; }, { A: 0, "B+": 0, B: 0, C: 0, none: 0 }),
       aCount: deals.filter((d) => consensus(d) === "A").length,
       pending: userId ? review.filter((d) => !d.my_grade).length : null,
       openQ: deals.reduce((s, d) => s + d.open_questions, 0),
@@ -43,29 +44,42 @@ export default function Dashboard() {
   }, [meta, deals, userId]);
 
   if (!view) return <Loading />;
+  const nudge = sourcingNudge(schedule, userId);
   const toCat = (id) => nav(`/deals?cat=${id}`);
 
   return (
     <>
-      <div className="page-head">
+      <div className="page-head dash-head">
         <div>
-          <h1>딜 아카이브 대시보드</h1>
-          <p className="sub">분류·등급·6대 지표로 본 전체 딜 현황 — 타일이나 막대를 누르면 해당 분류로 들어갑니다</p>
+          <div className="eyebrow">{todayLabel()}</div>
+          <h1>딜 아카이브 <em>한눈에 보기</em></h1>
         </div>
-        <div className="actions"><Link to="/new" className="btn primary">+ 딜 등록</Link></div>
+        <div className="actions"><Link to="/new" className="btn dark">+ 딜 등록</Link></div>
       </div>
 
-      <div className="kpis">
-        <div className="card kpi"><div className="label">전체 딜</div><div className="value">{deals.length}</div><div className="meta">{view.byCat.length}개 대분류 · 미평가 {view.tbd}건</div></div>
-        <div className="card kpi"><div className="label">합의 A등급</div><div className="value">{view.aCount}</div><div className="meta">투표 평균 3.5 이상</div></div>
-        <div className="card kpi"><div className="label">심사중</div><div className="value">{view.review.length}</div><Link className="meta" to="/review">심사 보드 →</Link></div>
-        <div className="card kpi"><div className="label">내 투표 대기</div><div className="value">{view.pending ?? "–"}</div><div className="meta">{userId ? "심사중 딜 중 미투표" : "담당자 선택 필요"}</div></div>
-        <div className="card kpi"><div className="label">미답변 질문</div><div className="value">{view.openQ}</div><div className="meta">담당자 답변 대기</div></div>
+      <RoundStrip schedule={schedule} nudge={nudge} userId={userId} />
+
+      <div className="card kpi-panel">
+        <div className="kpi hero">
+          <div><div className="label">전체 딜</div><div className="value">{deals.length}<small>건</small></div></div>
+          <div>
+            <div className="mix" role="img" aria-label={MIX_KEYS.map((k) => `${MIX_LABEL(k)} ${view.mix[k]}건`).join(", ")}>
+              {MIX_KEYS.filter((k) => view.mix[k]).map((k) => <i key={k} style={{ flex: view.mix[k], background: mixColor(k) }} />)}
+            </div>
+            <div className="legend">
+              {MIX_KEYS.map((k) => <span key={k}><i style={{ background: mixColor(k) }} />{MIX_LABEL(k)} {view.mix[k]}</span>)}
+            </div>
+          </div>
+        </div>
+        <Kpi label="합의 A등급" value={view.aCount} meta="투표 평균 3.5 이상" />
+        <Kpi label="심사중" value={view.review.length} meta={<Link to="/review">심사 보드 →</Link>} />
+        <Kpi label="내 투표 대기" value={view.pending} meta={!userId ? "담당자 선택 필요" : view.pending ? "심사중 딜 중 미투표" : "모두 투표했습니다"} />
+        <Kpi label="미답변 질문" value={view.openQ} meta={view.openQ ? "담당자 답변 대기" : "답변 대기 없음"} />
       </div>
 
       <div className="grid g-main">
         <ChartCard
-          title="분류별 딜 맵" hint="면적 = 딜 수 · 색 = 합의 등급(투표 평균)"
+          title="분류별 딜 맵" hint="면적 = 딜 수 · 색 = 합의 등급. 타일을 누르면 해당 분류로 이동"
           legend={<GradeLegend />}
           table={{ columns: ["대분류", "딜 수", "평균 점수", "합의 등급"], rows: view.byCat.map((x) => [x.c.name, x.list.length, x.avgScore?.toFixed(2), scoreToGrade(x.avgScore) || "미평가"]) }}
         >
@@ -75,6 +89,7 @@ export default function Dashboard() {
             items={view.byCat.map((x) => ({
               key: x.c.id, label: x.c.name, value: x.list.length, grade: scoreToGrade(x.avgScore),
               sub: `${x.list.length}건 · 평균 ${scoreToGrade(x.avgScore) || "-"}`,
+              subShort: scoreToGrade(x.avgScore) ? `평균 ${scoreToGrade(x.avgScore)}` : "미평가",
               tooltip: <TT title={x.c.name} rows={[["딜 수", `${x.list.length}건`], ["평균 점수", x.avgScore ? `${x.avgScore.toFixed(2)} / 4` : "-"], ["소분류", `${new Set(x.list.map((d) => d.subcategory)).size}개`]]} />,
             }))}
           />
@@ -106,13 +121,14 @@ export default function Dashboard() {
               <div className="activity">
                 {activity.map((a, i) => (
                   <div className="act" key={i}>
+                    <Avatar name={a.user_name} />
                     <div style={{ minWidth: 0 }}>
-                      <b>{a.user_name}</b>{" "}
-                      {a.kind === "deal" && "님이 딜을 등록했습니다 · "}
-                      {a.kind === "vote" && <>님이 <Grade g={a.detail} /> 투표 · </>}
-                      {a.kind === "question" && "님이 질문 · "}
-                      {a.kind === "answer" && "님이 답변 · "}
-                      <Link to={`/deals/${a.deal_id}`}>{a.deal_name}</Link>
+                      <div className="act-line">
+                        <span className="tag">{ACT_KIND[a.kind]}</span>
+                        <b>{a.user_name}</b>
+                        <Link to={`/deals/${a.deal_id}`} className="ellipsis">{a.deal_name}</Link>
+                        {a.kind === "vote" && <Grade g={a.detail} />}
+                      </div>
                       {(a.kind === "question" || a.kind === "answer") && <div className="muted ellipsis">“{a.detail}”</div>}
                     </div>
                     <span className="t">{fmtAgo(a.at)}</span>
@@ -147,5 +163,62 @@ export default function Dashboard() {
         </section>
       </div>
     </>
+  );
+}
+
+const ACT_KIND = { deal: "등록", vote: "투표", question: "질문", answer: "답변" };
+const MIX_KEYS = [...GRADE_IDS, "none"];
+const MIX_LABEL = (k) => (k === "none" ? "미평가" : k);
+const mixColor = (k) => (k === "none" ? "var(--g-none)" : gradeVar(k));
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+const todayLabel = () => { const d = new Date(); return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${WEEKDAYS[d.getDay()]}요일`; };
+
+/* KPI 한 칸 — 0건은 흐리게 해서 볼 것만 눈에 띄게 */
+function Kpi({ label, value, meta }) {
+  return (
+    <div className="kpi">
+      <div className="label">{label}</div>
+      <div className={`value ${value === 0 ? "zero" : ""}`}>{value ?? "–"}</div>
+      <div className="meta">{meta}</div>
+    </div>
+  );
+}
+
+/* 회차 띠 — 다가오는 딜소싱 마감일 · 심사일을 타임라인으로. 마감 D-1·당일에 미등록이면 등록 독려로 강조 */
+function RoundStrip({ schedule, nudge, userId }) {
+  const sourcing = upcomingEvent(schedule, "sourcing");
+  const review = upcomingEvent(schedule, "review");
+  if (!sourcing && !review) return null;
+  const events = [sourcing && { label: "딜소싱 마감", date: sourcing.date }, review && { label: "심사일", date: review.date }]
+    .filter(Boolean).sort((a, b) => a.date.localeCompare(b.date));
+  const next = events[0];
+  const steps = [{ label: "오늘", date: toYmd(new Date()) }, ...events];
+  const submitted = sourcing && userId && sourcing.submitted?.includes(userId);
+  const title = nudge
+    ? `딜소싱 마감이 ${nudge.dday === 0 ? "오늘" : "내일"}(${fmtMD(nudge.date)})입니다`
+    : `다음 일정은 ${next.label} ${fmtMD(next.date)}입니다`;
+  const desc = nudge
+    ? `이번 회차에 아직 등록한 딜이 없습니다. 마감 전에 딜을 등록해 주세요.${nudge.note ? ` ${nudge.note}` : ""}`
+    : !sourcing ? "지정된 딜소싱 마감일이 없습니다."
+      : submitted ? "이번 회차 딜을 등록했습니다."
+        : userId ? "이번 회차에 아직 등록한 딜이 없습니다." : "담당자를 선택하면 내 등록 현황이 표시됩니다.";
+  return (
+    <div className={`round ${nudge ? "urgent" : ""}`} role={nudge ? "alert" : undefined}>
+      <div className="round-lead">
+        <div className="round-dday">{fmtDday(ddayOf((nudge || next).date))}</div>
+        <div><b>{title}</b><p>{desc}</p></div>
+      </div>
+      <ol className="round-steps" aria-label="이번 회차 일정">
+        {steps.map((s, i) => {
+          const d = parseYmd(s.date);
+          return (
+            <li key={i} className={i > 0 && s.date === next.date && s.label === next.label ? "now" : ""}>
+              <i /><b>{s.label}</b><span>{d.getMonth() + 1}.{d.getDate()} {WEEKDAYS[d.getDay()]}</span>
+            </li>
+          );
+        })}
+      </ol>
+      {nudge && <Link to="/new" className="btn primary">지금 딜 등록</Link>}
+    </div>
   );
 }

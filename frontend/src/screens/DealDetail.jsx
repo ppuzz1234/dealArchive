@@ -31,6 +31,9 @@ export default function DealDetail() {
     { name: compare.name, values: metricAverages(meta, compare.list), color: "var(--s2)" },
   ];
 
+  // 담당자 등급(A/B+/B/C)은 다른 담당자 reveal_min명 이상이 투표해야 공개된다. 6대 지표는 항상 공개.
+  const hidden = deal.self_hidden;
+
   const setStatus = async (status) => {
     if (await run(() => api.updateDeal(deal.id, { status }), status === "archived" ? "아카이브로 편입했습니다" : "심사중으로 되돌렸습니다")) refresh();
   };
@@ -59,7 +62,7 @@ export default function DealDetail() {
           </div>
         </div>
         <div className="grade-box card card-pad">
-          <div className="gb"><Grade g={deal.owner_grade} lg />담당자 등급</div>
+          <div className="gb"><Grade g={deal.owner_grade} lg hidden={hidden} />담당자 등급</div>
           <div className="gb"><Grade g={cg} lg />합의 등급</div>
           <div className="gb"><b style={{ fontSize: 22, color: "var(--txt)" }}>{deal.vote_count}</b>투표</div>
         </div>
@@ -180,6 +183,20 @@ function VotePanel({ deal, onChange }) {
         <div className="mt-16"><GradeSplitBar dist={gradeDist(deal.votes.map((v) => v.grade))} /></div>
 
         <div className="mt-16">
+          {deal.self_hidden && (
+            <div className="voter">
+              <Avatar name={deal.owner_name} />
+              <div style={{ minWidth: 0 }}>
+                <div className="row"><span className="who">{deal.owner_name}</span><span className="chip">담당자</span><Grade hidden /></div>
+                <div className="c">다른 담당자 {deal.reveal_min}명 이상이 투표하면 공개됩니다 (현재 {deal.peer_votes}/{deal.reveal_min})</div>
+              </div>
+            </div>
+          )}
+          {!deal.self_hidden && deal.owner_id === userId && deal.owner_grade && deal.peer_votes < deal.reveal_min && (
+            <p className="muted" style={{ fontSize: 12, margin: "0 0 8px" }}>
+              내 등급은 다른 담당자에게 아직 '?'로 보입니다 — {deal.reveal_min - deal.peer_votes}명 더 투표하면 공개 (현재 {deal.peer_votes}/{deal.reveal_min})
+            </p>
+          )}
           {deal.votes.map((v) => (
             <div className="voter" key={v.id}>
               <Avatar name={v.user_name} />
@@ -211,7 +228,37 @@ function QA({ deal, isOwner, onChange }) {
     if (!body?.trim()) return;
     if (await run(() => api.answer(qid, body), "답변을 등록했습니다")) { setReplies((r) => ({ ...r, [qid]: "" })); onChange(); }
   };
-  const del = async (qid) => { if (confirm("질문을 삭제할까요?") && await run(() => api.deleteQuestion(qid), "삭제했습니다")) onChange(); };
+  const del = async (x) => {
+    const msg = x.answers.length ? `질문을 삭제할까요? 달린 답변 ${x.answers.length}개도 함께 삭제됩니다.` : "질문을 삭제할까요?";
+    if (confirm(msg) && await run(() => api.deleteQuestion(x.id), "삭제했습니다")) onChange();
+  };
+  const delAnswer = async (aid) => { if (confirm("답변을 삭제할까요?") && await run(() => api.deleteAnswer(aid), "삭제했습니다")) onChange(); };
+
+  // 수정 중인 글 — { type: "q" | "a", id, body }. 작성자 본인만 수정·삭제 가능
+  const [editing, setEditing] = useState(null);
+  const isEditing = (type, id) => editing?.type === type && editing.id === id;
+  const saveEdit = async () => {
+    if (!editing?.body.trim()) return;
+    const call = editing.type === "q" ? () => api.editQuestion(editing.id, editing.body) : () => api.editAnswer(editing.id, editing.body);
+    if (await run(call, "수정했습니다")) { setEditing(null); onChange(); }
+  };
+  const editor = (label) => (
+    <div className="qa-edit">
+      <textarea rows={2} autoFocus value={editing.body} aria-label={label}
+        onChange={(e) => setEditing((x) => ({ ...x, body: e.target.value }))}
+        onKeyDown={(e) => { if (e.key === "Escape") setEditing(null); }} />
+      <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
+        <button type="button" className="btn ghost sm" onClick={() => setEditing(null)}>취소</button>
+        <button type="button" className="btn primary sm" onClick={saveEdit} disabled={!editing.body.trim()}>저장</button>
+      </div>
+    </div>
+  );
+  const tools = (type, item, onDelete) => item.user_id === userId && !isEditing(type, item.id) && (
+    <span className="qa-tools">
+      <button className="btn ghost sm" onClick={() => setEditing({ type, id: item.id, body: item.body })}>수정</button>
+      <button className="btn ghost sm" onClick={onDelete}>삭제</button>
+    </span>
+  );
 
   return (
     <section className="card" id="qa">
@@ -226,14 +273,18 @@ function QA({ deal, isOwner, onChange }) {
           {deal.questions.map((x) => (
             <div className="q" key={x.id}>
               <div className="q-head"><span className="who">{x.user_name}</span><span>{fmtAgo(x.created_at)}</span>
+                {x.edited_at && <span title={`${fmtAgo(x.edited_at)} 수정`}>(수정됨)</span>}
                 {x.answers.length === 0 && <span className="chip warn">답변 대기</span>}
-                {x.user_id === userId && <button className="btn ghost sm" style={{ marginLeft: "auto" }} onClick={() => del(x.id)}>삭제</button>}
+                {tools("q", x, () => del(x))}
               </div>
-              <div className="q-body">{x.body}</div>
+              {isEditing("q", x.id) ? editor("질문 수정") : <div className="q-body">{x.body}</div>}
               {x.answers.map((a) => (
                 <div className="a" key={a.id}>
-                  <div className="q-head"><span className="who">{a.user_name}</span><span>{fmtAgo(a.created_at)}</span></div>
-                  <div className="q-body">{a.body}</div>
+                  <div className="q-head"><span className="who">{a.user_name}</span><span>{fmtAgo(a.created_at)}</span>
+                    {a.edited_at && <span title={`${fmtAgo(a.edited_at)} 수정`}>(수정됨)</span>}
+                    {tools("a", a, () => delAnswer(a.id))}
+                  </div>
+                  {isEditing("a", a.id) ? editor("답변 수정") : <div className="q-body">{a.body}</div>}
                 </div>
               ))}
               {isOwner && (

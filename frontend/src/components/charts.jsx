@@ -149,11 +149,19 @@ export function Treemap({ items, height = 300, onSelect }) {
     <div ref={ref}>
       {w > 0 && (
         <svg className="chart" width={w} height={height} role="list" aria-label="분류별 딜 트리맵">
+          <defs>
+            {/* 미평가 타일 — 회색 덩어리 대신 빗금으로 '아직 값 없음'을 구분 */}
+            <pattern id="tm-hatch" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width="12" height="12" fill="var(--g-none)" />
+              <rect width="6" height="12" fill="var(--g-none-2)" />
+            </pattern>
+          </defs>
           {tiles.map((t) => {
-            const gx = 1, gw = Math.max(0, t.w - 2), gh = Math.max(0, t.h - 2);
+            const gx = 2.5, gw = Math.max(0, t.w - 5), gh = Math.max(0, t.h - 5);
             const ink = `var(--g-ink-${gradeClass(t.grade).slice(2)})`;
             const fitsName = gw > 64 && gh > 34;
             const fitsSub = gw > 64 && gh > 54;
+            const fitsCount = gw > 44 && gh > 92; // 딜 수를 큰 숫자로 — 들어가면 보조 문구에서는 건수를 뺀다
             return (
               <g
                 key={t.key}
@@ -168,15 +176,20 @@ export function Treemap({ items, height = 300, onSelect }) {
                 onFocus={(e) => tt.showAt(e.currentTarget, t.tooltip)}
                 onBlur={tt.hide}
               >
-                <rect x={t.x + gx} y={t.y + gx} width={gw} height={gh} rx={4} fill={gradeVar(t.grade)} />
+                <rect x={t.x + gx} y={t.y + gx} width={gw} height={gh} rx={10} fill={t.grade ? gradeVar(t.grade) : "url(#tm-hatch)"} />
                 {fitsName && (
-                  <text x={t.x + 10} y={t.y + 21} style={{ fill: ink, fontWeight: 700, fontSize: 13 }}>
-                    {clip(t.label, gw - 20, 13)}
+                  <text x={t.x + 15} y={t.y + 27} style={{ fill: ink, fontWeight: 700, fontSize: 13.5 }}>
+                    {clip(t.label, gw - 26, 13.5)}
                   </text>
                 )}
                 {fitsSub && (
-                  <text x={t.x + 10} y={t.y + 39} style={{ fill: ink, opacity: 0.85, fontSize: 12 }}>
-                    {clip(t.sub ?? `${t.value}건`, gw - 20, 12)}
+                  <text x={t.x + 15} y={t.y + 45} style={{ fill: ink, opacity: 0.8, fontSize: 11.5 }}>
+                    {clip((fitsCount && t.subShort) || (t.sub ?? `${t.value}건`), gw - 26, 11.5)}
+                  </text>
+                )}
+                {fitsCount && (
+                  <text x={t.x + 15} y={t.y + gx + gh - 14} style={{ fill: ink, fontWeight: 800, fontSize: 26, letterSpacing: "-0.04em" }}>
+                    {t.value}
                   </text>
                 )}
               </g>

@@ -3,6 +3,7 @@ import multer from "multer";
 import { query, db } from "../db.js";
 import { wrap, HttpError, currentUserId, requireUser, clean } from "../lib/http.js";
 import { similarDeals } from "../lib/similarity.js";
+import { maskDeal } from "../lib/visibility.js";
 import { METRICS, GRADES, STATUSES, isValidCategory, REGIONS } from "../taxonomy.js";
 
 const r = Router();
@@ -10,7 +11,11 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 
 
 const GRADE_SCORE_SQL = `case v.grade when 'A' then 4 when 'B+' then 3 when 'B' then 2 else 1 end`;
 
-/* 목록/상세 공용 SELECT — 투표 집계·Q&A·첨부 카운트 포함 */
+/* 담당자 본인을 제외한 투표 수 — 담당자 등급 공개 조건(lib/visibility.js) */
+const PEER_VOTES_SQL = `(select count(*) from votes v where v.deal_id = d.id and v.user_id is distinct from d.owner_id)::int`;
+
+/* 목록/상세 공용 SELECT — 투표 집계·Q&A·첨부 카운트 포함.
+   응답으로 내보내기 전에 반드시 maskDeal 을 거친다(담당자 등급 비공개 처리). */
 const DEAL_SELECT = `
   select d.id, d.no, d.name, d.summary, d.structure, d.cases, d.risks, d.category, d.subcategory, d.region,
          d.vehicle, d.sourcing_model, d.target_return, d.horizon, d.liquidity_terms, d.min_ticket,
@@ -21,6 +26,7 @@ const DEAL_SELECT = `
          (select avg(${GRADE_SCORE_SQL}) from votes v where v.deal_id = d.id)::float as avg_score,
          (select coalesce(json_agg(v.grade), '[]'::json) from votes v where v.deal_id = d.id) as grades,
          (select v.grade from votes v where v.deal_id = d.id and v.user_id = d.owner_id) as owner_grade,
+         ${PEER_VOTES_SQL} as peer_votes,
          (select v.grade from votes v where v.deal_id = d.id and v.user_id = $1) as my_grade,
          (select count(*) from questions q where q.deal_id = d.id)::int as question_count,
          (select count(*) from questions q where q.deal_id = d.id
@@ -31,7 +37,7 @@ const DEAL_SELECT = `
 async function loadDeal(id, userId) {
   const { rows } = await query(`${DEAL_SELECT} where d.id = $2`, [userId, id]);
   if (!rows[0]) throw new HttpError(404, "딜을 찾을 수 없습니다");
-  return rows[0];
+  return maskDeal(rows[0], userId);
 }
 
 /* 입력 정리 — 화면 양식(resume형)의 필드만 허용 */
@@ -72,33 +78,37 @@ const validGrade = (g) => GRADES.some((x) => x.id === g);
 
 // ---------- 목록 ----------
 r.get("/", wrap(async (req, res) => {
-  const params = [currentUserId(req)];
+  const userId = currentUserId(req);
+  const params = [userId];
   let where = "";
   if (req.query.status) { params.push(req.query.status); where = ` where d.status = $${params.length}`; }
   const { rows } = await query(`${DEAL_SELECT}${where} order by d.id`, params);
-  res.json(rows);
+  res.json(rows.map((d) => maskDeal(d, userId)));
 }));
 
 // ---------- 상세 (투표·Q&A·첨부·유사 딜 포함) ----------
 r.get("/:id", wrap(async (req, res) => {
   const id = Number(req.params.id);
-  const deal = await loadDeal(id, currentUserId(req));
+  const userId = currentUserId(req);
+  const deal = await loadDeal(id, userId);
   const [votes, qs, ans, files, all] = await Promise.all([
     query(`select v.id, v.user_id, u.name as user_name, v.grade, v.comment, v.updated_at
              from votes v join users u on u.id = v.user_id where v.deal_id = $1 order by v.updated_at desc`, [id]),
-    query(`select q.id, q.user_id, u.name as user_name, q.body, q.created_at
+    query(`select q.id, q.user_id, u.name as user_name, q.body, q.created_at, q.edited_at
              from questions q join users u on u.id = q.user_id where q.deal_id = $1 order by q.created_at desc`, [id]),
-    query(`select a.id, a.question_id, a.user_id, u.name as user_name, a.body, a.created_at
+    query(`select a.id, a.question_id, a.user_id, u.name as user_name, a.body, a.created_at, a.edited_at
              from answers a join users u on u.id = a.user_id
             where a.question_id in (select id from questions where deal_id = $1) order by a.created_at`, [id]),
     query(`select a.id, a.filename, a.mime, a.size, a.user_id, u.name as user_name, a.created_at
              from attachments a left join users u on u.id = a.user_id where a.deal_id = $1 order by a.created_at desc`, [id]),
     query(`select id, category, subcategory, region, vehicle, metrics from deals`),
   ]);
+  // 비공개 상태인 담당자 등급은 투표 목록에서도 제외
+  const visibleVotes = deal.self_hidden ? votes.rows.filter((v) => v.user_id !== deal.owner_id) : votes.rows;
   const questions = qs.rows.map((q) => ({ ...q, answers: ans.rows.filter((a) => a.question_id === q.id) }));
   res.json({
     ...deal,
-    votes: votes.rows,
+    votes: visibleVotes,
     questions,
     attachments: files.rows,
     similar: similarDeals(deal, all.rows),

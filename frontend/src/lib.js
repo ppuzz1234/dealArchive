@@ -62,6 +62,27 @@ export function splitCases(text) {
   ];
 }
 
+/* ---------- 일정(딜소싱 마감일 · 심사일) ---------- */
+export const SCHEDULE_KINDS = { sourcing: "딜소싱 마감", review: "심사일" };
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+const pad2 = (n) => String(n).padStart(2, "0");
+export const parseYmd = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+export const toYmd = (dt) => `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+export const fmtMD = (s) => { const d = parseYmd(s); return `${d.getMonth() + 1}.${d.getDate()} (${WEEKDAYS[d.getDay()]})`; };
+/* 오늘 기준 남은 일수 — 0이면 당일, 음수면 지남 */
+export const ddayOf = (s) => Math.round((parseYmd(s) - parseYmd(toYmd(new Date()))) / 86400000);
+export const fmtDday = (n) => (n === 0 ? "D-DAY" : n > 0 ? `D-${n}` : `D+${-n}`);
+/* 가장 가까운 다가오는 일정 (schedule 은 날짜순) */
+export const upcomingEvent = (schedule, kind) => (schedule || []).find((e) => e.kind === kind && ddayOf(e.date) >= 0) || null;
+/* 딜소싱 마감 D-1 · 당일인데 이번 회차에 딜을 올리지 않은 담당자에게 등록을 독려할 일정 */
+export function sourcingNudge(schedule, userId) {
+  if (!userId) return null;
+  const e = upcomingEvent(schedule, "sourcing");
+  if (!e) return null;
+  const dday = ddayOf(e.date);
+  return dday <= 1 && !e.submitted?.includes(userId) ? { ...e, dday } : null;
+}
+
 export const avg = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
 
 export function metricAverages(meta, deals) {

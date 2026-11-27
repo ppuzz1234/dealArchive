@@ -1,7 +1,8 @@
 /* 메타(분류·지표·등급) · 담당자 · 답변 · 첨부 다운로드 · 활동 로그 · 글로벌 피드 */
 import { Router } from "express";
 import { query } from "../db.js";
-import { wrap, HttpError, requireUser, clean } from "../lib/http.js";
+import { wrap, HttpError, requireUser, currentUserId, clean } from "../lib/http.js";
+import { REVEAL_MIN_PEER_VOTES } from "../lib/visibility.js";
 import { CATEGORIES, METRICS, GRADES, REGIONS, STATUSES } from "../taxonomy.js";
 
 const r = Router();
@@ -43,6 +44,41 @@ r.post("/questions/:qid/answers", wrap(async (req, res) => {
   res.status(201).json({ ok: true });
 }));
 
+/* 질문·답변 수정/삭제 공통 — 작성자 본인만 */
+async function ownRow(table, id, userId, label) {
+  const { rows } = await query(`select user_id from ${table} where id = $1`, [id]);
+  if (!rows[0]) throw new HttpError(404, `${label}을 찾을 수 없습니다`);
+  if (rows[0].user_id !== userId) throw new HttpError(403, "작성자만 수정·삭제할 수 있습니다");
+}
+
+r.put("/questions/:qid", wrap(async (req, res) => {
+  const userId = requireUser(req);
+  const body = clean(req.body?.body);
+  if (!body) throw new HttpError(400, "질문 내용을 입력하세요");
+  const id = Number(req.params.qid);
+  await ownRow("questions", id, userId, "질문");
+  await query("update questions set body = $1, edited_at = now() where id = $2", [body, id]);
+  res.json({ ok: true });
+}));
+
+r.put("/answers/:aid", wrap(async (req, res) => {
+  const userId = requireUser(req);
+  const body = clean(req.body?.body);
+  if (!body) throw new HttpError(400, "답변 내용을 입력하세요");
+  const id = Number(req.params.aid);
+  await ownRow("answers", id, userId, "답변");
+  await query("update answers set body = $1, edited_at = now() where id = $2", [body, id]);
+  res.json({ ok: true });
+}));
+
+r.delete("/answers/:aid", wrap(async (req, res) => {
+  const userId = requireUser(req);
+  const id = Number(req.params.aid);
+  await ownRow("answers", id, userId, "답변");
+  await query("delete from answers where id = $1", [id]);
+  res.json({ ok: true });
+}));
+
 r.delete("/questions/:qid", wrap(async (req, res) => {
   const userId = requireUser(req);
   const { rows } = await query("select user_id from questions where id = $1", [Number(req.params.qid)]);
@@ -76,13 +112,16 @@ r.delete("/attachments/:aid", wrap(async (req, res) => {
 // ---------- 최근 활동 (등록·투표·질문·답변) ----------
 r.get("/activity", wrap(async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 20, 100);
+  // 담당자 본인의 투표는 자가 평가 공개 조건(다른 담당자 N명 투표)을 채운 뒤에만 다른 사람의 활동 로그에 나온다
   const { rows } = await query(
     `select * from (
        select 'deal' as kind, d.created_at as at, u.name as user_name, d.id as deal_id, d.name as deal_name, null as detail
          from deals d left join users u on u.id = d.owner_id where d.no is null
        union all
        select 'vote', v.updated_at, u.name, d.id, d.name, v.grade
-         from votes v join users u on u.id = v.user_id join deals d on d.id = v.deal_id where v.user_id <> d.owner_id or d.no is null
+         from votes v join users u on u.id = v.user_id join deals d on d.id = v.deal_id where v.user_id <> d.owner_id
+            or (d.no is null and (d.owner_id = $2::int
+                 or (select count(*) from votes p where p.deal_id = d.id and p.user_id <> d.owner_id) >= $3::int))
        union all
        select 'question', q.created_at, u.name, d.id, d.name, left(q.body, 80)
          from questions q join users u on u.id = q.user_id join deals d on d.id = q.deal_id
@@ -90,7 +129,7 @@ r.get("/activity", wrap(async (req, res) => {
        select 'answer', a.created_at, u.name, d.id, d.name, left(a.body, 80)
          from answers a join users u on u.id = a.user_id join questions q on q.id = a.question_id join deals d on d.id = q.deal_id
      ) x order by at desc limit $1`,
-    [limit]
+    [limit, currentUserId(req), REVEAL_MIN_PEER_VOTES]
   );
   res.json(rows);
 }));

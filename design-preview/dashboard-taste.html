@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>DealArchive 대시보드 시안 B (design-taste-frontend)</title>
+<style>
+/* Design read: 사내 딜소싱 팀용 BI 대시보드, 차분한 데이터 우선 언어, redesign-preserve.
+   Dials: VARIANCE 4 / MOTION 2 / DENSITY 7. 카드 상자 대신 여백과 1px 선, 숫자는 tabular, 강조색은 브랜드 오렌지 하나, 모서리는 6px 한 가지. */
+@font-face { font-family: "LifePlus"; src: url("file:///C:/git/DealArchive/frontend/public/fonts/body/LIFEPLUS%20LIGHT.TTF") format("truetype"); font-weight: 300; }
+@font-face { font-family: "LifePlus"; src: url("file:///C:/git/DealArchive/frontend/public/fonts/body/LIFEPLUS%20MEDIUM.TTF") format("truetype"); font-weight: 400 500; }
+@font-face { font-family: "LifePlus"; src: url("file:///C:/git/DealArchive/frontend/public/fonts/heading/LIFEPLUS%20BOLD.TTF") format("truetype"); font-weight: 600 800; }
+:root {
+  --bg: #fafafa; --rail: #f3f3f4; --line: #e4e4e7; --line-2: #d0d0d6;
+  --ink: #18181b; --ink-2: #52525b; --ink-3: #8a8a93;
+  --accent: #e8681a; --accent-ink: #b24a0c; --accent-soft: #fdf0e6;
+  --gA: #172f57; --gBp: #2d5ba3; --gB: #7fa5d8; --gC: #c8d9ef; --gN: #e7e7ea;
+  --r: 6px;
+}
+* { box-sizing: border-box; margin: 0; }
+body { width: 1600px; height: 1240px; overflow: hidden; background: var(--bg); color: var(--ink);
+  font-family: "LifePlus", "Malgun Gothic", sans-serif; font-size: 13.5px; line-height: 1.45; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+.shell { display: grid; grid-template-columns: 216px 1fr; height: 100%; }
+
+/* 사이드바: 색 면 하나, 상자 없음 */
+aside { background: var(--rail); border-right: 1px solid var(--line); padding: 20px 12px 16px; display: flex; flex-direction: column; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 22px; }
+.mark { width: 28px; height: 28px; border-radius: var(--r); background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+.brand b { font-size: 15px; font-weight: 800; letter-spacing: -0.02em; display: block; line-height: 1.15; }
+.brand span { font-size: 10.5px; color: var(--ink-3); }
+.nl { font-size: 11px; color: var(--ink-3); font-weight: 600; padding: 16px 8px 6px; }
+.ni { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: var(--r); color: var(--ink-2); font-weight: 500; position: relative; }
+.ni svg { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.ni.on { color: var(--ink); font-weight: 700; }
+.ni.on::before { content: ""; position: absolute; left: -12px; top: 6px; bottom: 6px; width: 3px; background: var(--ink); border-radius: 0 2px 2px 0; }
+.ni .n { margin-left: auto; font-size: 11.5px; color: var(--ink-3); }
+.ni.nudge { color: var(--accent-ink); font-weight: 700; }
+.badge { margin-left: auto; font-size: 10.5px; font-weight: 800; padding: 1px 6px; border-radius: 4px; background: var(--accent); color: #fff; }
+.badge.q { background: transparent; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line-2); }
+.sched { margin-top: auto; border-top: 1px solid var(--line); padding: 14px 8px 0; }
+.sched h6 { font-size: 11px; color: var(--ink-3); font-weight: 600; margin-bottom: 8px; }
+.sr { display: grid; grid-template-columns: 1fr auto; row-gap: 0; column-gap: 8px; padding: 6px 0; align-items: center; }
+.sr b { font-size: 13px; } .sr small { grid-column: 1; font-size: 11.5px; color: var(--ink-3); }
+.sr .badge { grid-row: 1 / span 2; grid-column: 2; }
+.me { padding: 14px 8px 0; font-size: 11.5px; color: var(--ink-3); }
+
+/* 본문 */
+main { padding: 0 44px; min-width: 0; }
+.top { height: 60px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); margin: 0 -44px; padding: 0 44px; }
+.search { display: flex; align-items: center; gap: 9px; width: 380px; color: var(--ink-3); }
+.search svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; }
+.top .sp { flex: 1; }
+.who { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.av { width: 26px; height: 26px; border-radius: var(--r); background: var(--ink); color: #fff; display: grid; place-items: center; font-size: 10.5px; font-weight: 700; flex: none; }
+.btn { height: 36px; padding: 0 14px; border-radius: var(--r); font-weight: 700; display: inline-flex; align-items: center; font-size: 13.5px; white-space: nowrap; }
+.btn.pri { background: var(--accent); color: #fff; }
+
+/* 머리: 제목 + 핵심 수치를 상자 없이 한 줄에 */
+.head { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 24px; padding: 30px 0 22px; }
+h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; }
+.head p { color: var(--ink-2); margin-top: 5px; font-size: 13.5px; }
+.notice { display: flex; align-items: center; gap: 14px; padding: 10px 10px 10px 14px; border-radius: var(--r); background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.notice b { font-weight: 700; } .notice span { color: var(--ink-2); }
+.notice .d { font-size: 15px; font-weight: 800; color: var(--accent-ink); letter-spacing: -0.02em; }
+
+.stats { display: grid; grid-template-columns: 2.1fr repeat(4, 1fr); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--line); }
+.stats > div { padding: 18px 0 18px 22px; }
+.stats > div:first-child { padding-left: 0; display: grid; grid-template-columns: auto 1fr; gap: 26px; align-items: center; padding-right: 30px; }
+.stats > div + div { border-left: 1px solid var(--line); }
+.sl { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.sv { font-size: 34px; font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; margin-top: 4px; }
+.sv.big { font-size: 64px; line-height: 0.95; margin-top: 2px; }
+.sv.z { color: var(--line-2); }
+.sm { font-size: 12px; color: var(--ink-3); margin-top: 3px; }
+.mix { display: flex; height: 22px; gap: 2px; }
+.mix i { display: block; height: 100%; border-radius: 2px; }
+.lg { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
+.lg span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; } .lg i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.lg b { color: var(--ink); font-weight: 700; }
+
+/* 본문 2단: 넓은 분석 영역 + 좁은 레일, 세로 선 하나로만 구분 */
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) 372px; }
+.colL { padding: 26px 34px 0 0; } .colR { padding: 26px 0 0 30px; border-left: 1px solid var(--line); min-height: 900px; }
+.sh { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.sh h3 { font-size: 15px; font-weight: 700; letter-spacing: -0.015em; } .sh span { font-size: 12px; color: var(--ink-3); }
+.sh a { margin-left: auto; font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.sec + .sec { margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+
+.tm { display: flex; gap: 3px; height: 344px; }
+.tm .col { display: flex; flex-direction: column; gap: 3px; min-width: 0; } .tm .rowx { display: flex; gap: 3px; min-height: 0; }
+.tile { border-radius: var(--r); padding: 11px 12px; min-height: 0; min-width: 0; overflow: hidden; display: flex; flex-direction: column; }
+.tile b { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .g { font-size: 11.5px; opacity: 0.8; white-space: nowrap; }
+.tile .c { margin-top: auto; font-size: 22px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.Bp { background: var(--gBp); color: #fff; } .B { background: var(--gB); color: #0e2444; } .C { background: var(--gC); color: #1d3760; }
+.N { background: var(--gN); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line-2); }
+
+.hm { width: 100%; border-collapse: separate; border-spacing: 3px; margin: 0 -3px; font-size: 12.5px; }
+.hm th { font-weight: 600; color: var(--ink-3); font-size: 11.5px; padding: 0 0 4px; }
+.hm td:first-child { font-weight: 600; white-space: nowrap; padding-right: 14px; width: 150px; }
+.hm td.c { text-align: center; height: 27px; border-radius: 4px; font-weight: 700; width: 13.5%; }
+.s1 { background: #eef2f8; color: #5d7090; } .s2 { background: #c8d9ef; color: #1d3760; } .s3 { background: #9ab9e2; color: #0e2444; } .s4 { background: #4c7bbd; color: #fff; } .s5 { background: #1e417c; color: #fff; }
+
+.dist { display: grid; row-gap: 8px; }
+.dr { display: grid; grid-template-columns: 116px 1fr 16px; align-items: center; gap: 10px; font-size: 12.5px; }
+.dr .nm { font-weight: 600; white-space: nowrap; }
+.dr .bar { display: flex; gap: 2px; height: 12px; } .dr .bar i { display: block; height: 100%; border-radius: 2px; }
+.dr .ct { color: var(--ink-3); text-align: right; font-size: 12px; }
+
+.act { display: grid; row-gap: 16px; }
+.ai { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; }
+.ai .k { font-size: 11.5px; color: var(--ink-3); font-weight: 600; }
+.ai p { font-size: 13px; grid-column: 1; } .ai p b { font-weight: 700; }
+.ai q { display: block; quotes: none; font-size: 12.5px; color: var(--ink-2); grid-column: 1; }
+.ai time { font-size: 11.5px; color: var(--ink-3); grid-row: 1; grid-column: 2; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside>
+    <div class="brand"><div class="mark">P</div><div><b>DealArchive</b><span>PLUS 소싱 매트릭스</span></div></div>
+    <div class="ni on"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10Zm0 8h8v-6H3v6Zm10 0h8V11h-8v10Zm0-18v6h8V3h-8Z"/></svg>대시보드</div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M4 4h16v4H4zM5 8h14v12H5zM10 12h4"/></svg>딜 아카이브<span class="n">35</span></div>
+    <div class="nl">신규 딜 심사</div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11"/></svg>심사 보드<span class="n">1</span></div>
+    <div class="ni nudge"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>딜 등록<span class="badge">D-1</span></div>
+    <div class="nl">인사이트</div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-9 9h18M12 3c2.5 2.5 3.8 5.5 3.8 9S14.5 18.5 12 21c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3Z"/></svg>글로벌 딜 피드</div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M9 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM22 19v-1a4 4 0 0 0-3-3.9M16 3.1a3.5 3.5 0 0 1 0 6.8"/></svg>담당자</div>
+    <div class="nl">관리</div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5"/></svg>관리자 · 일정</div>
+
+    <div class="sched">
+      <h6>다가오는 일정</h6>
+      <div class="sr"><b>딜소싱 마감</b><small>11.28 토요일</small><span class="badge">D-1</span></div>
+      <div class="sr"><b>심사일</b><small>11.30 월요일</small><span class="badge q">D-3</span></div>
+    </div>
+    <div class="me">김대원님으로 작업 중</div>
+  </aside>
+
+  <main>
+    <div class="top">
+      <div class="search"><svg viewBox="0 0 24 24"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm10 2-4.3-4.3"/></svg>딜 이름, 사례, 리스크, 담당자 검색</div>
+      <div class="sp"></div>
+      <div class="who"><div class="av">대원</div>김대원</div>
+    </div>
+
+    <div class="head">
+      <div><h1>딜 아카이브 대시보드</h1><p>분류, 등급, 6대 지표로 본 전체 딜 현황입니다. 타일이나 막대를 누르면 해당 분류로 들어갑니다.</p></div>
+      <div class="notice"><span class="d">D-1</span><div><b>딜소싱 마감이 내일(11.28 토)입니다.</b> <span>이번 회차에 등록한 딜이 없습니다.</span></div><div class="btn pri">딜 등록</div></div>
+    </div>
+
+    <div class="stats">
+      <div>
+        <div><div class="sl">전체 딜</div><div class="sv big">35</div></div>
+        <div>
+          <div class="mix"><i style="flex:1;background:var(--gA)"></i><i style="flex:8;background:var(--gBp)"></i><i style="flex:3;background:var(--gB)"></i><i style="flex:3;background:var(--gC)"></i><i style="flex:20;background:var(--gN)"></i></div>
+          <div class="lg"><span><i style="background:var(--gA)"></i>A <b>1</b></span><span><i style="background:var(--gBp)"></i>B+ <b>8</b></span><span><i style="background:var(--gB)"></i>B <b>3</b></span><span><i style="background:var(--gC)"></i>C <b>3</b></span><span><i style="background:var(--gN)"></i>미평가 <b>20</b></span></div>
+        </div>
+      </div>
+      <div><div class="sl">합의 A등급</div><div class="sv">1</div><div class="sm">투표 평균 3.5 이상</div></div>
+      <div><div class="sl">심사중</div><div class="sv">1</div><div class="sm">심사 보드에서 확인</div></div>
+      <div><div class="sl">내 투표 대기</div><div class="sv z">0</div><div class="sm">모두 투표했습니다</div></div>
+      <div><div class="sl">미답변 질문</div><div class="sv z">0</div><div class="sm">답변 대기 없음</div></div>
+    </div>
+
+    <div class="cols">
+      <div class="colL">
+        <section class="sec">
+          <div class="sh"><h3>분류별 딜 맵</h3><span>면적은 딜 수, 색은 합의 등급</span><a>표로 보기</a></div>
+          <div class="tm">
+            <div class="col" style="flex:11">
+              <div class="tile Bp" style="flex:6"><b>크레딧·구조화</b><span class="g">평균 B+</span><div class="c">6</div></div>
+              <div class="tile N" style="flex:5"><b>인프라·에너지전환</b><span class="g">미평가</span><div class="c">5</div></div>
+            </div>
+            <div class="col" style="flex:9">
+              <div class="tile Bp" style="flex:5"><b>패션자산·IP</b><span class="g">평균 B+</span><div class="c">5</div></div>
+              <div class="tile Bp" style="flex:4"><b>디지털자산</b><span class="g">평균 B+</span><div class="c">4</div></div>
+            </div>
+            <div class="col" style="flex:6">
+              <div class="tile C" style="flex:1"><b>부동산·레저</b><span class="g">평균 C</span><div class="c">3</div></div>
+              <div class="tile Bp" style="flex:1"><b>보험·연금</b><span class="g">평균 B+</span><div class="c">3</div></div>
+            </div>
+            <div class="col" style="flex:9">
+              <div class="tile B" style="flex:1"><b>리퀴드 얼터너티브</b><span class="g">평균 B</span><div class="c">3</div></div>
+              <div class="tile N" style="flex:1"><b>WM 솔루션·플랫폼</b><span class="g">미평가</span><div class="c">3</div></div>
+              <div class="rowx" style="flex:1">
+                <div class="tile Bp" style="flex:2"><b>실물자산·원자재</b><span class="g">평균 B+</span><div class="c">2</div></div>
+                <div class="tile C" style="flex:1"><b>사모시장</b><span class="g">C</span><div class="c">1</div></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec">
+          <div class="sh"><h3>분류 × 6대 지표</h3><span>분류 내 딜들의 지표 평균 (1~5), 예시 값</span><a>표로 보기</a></div>
+          <table class="hm">
+            <tr><th></th><th>기대수익</th><th>안정성</th><th>유동성</th><th>실행가능성</th><th>고객매력도</th><th>그룹 시너지</th></tr>
+            <tr><td>크레딧·구조화</td><td class="c s4">3.8</td><td class="c s4">3.7</td><td class="c s2">2.5</td><td class="c s3">3.3</td><td class="c s3">3.2</td><td class="c s3">3.0</td></tr>
+            <tr><td>패션자산·IP</td><td class="c s4">3.6</td><td class="c s2">2.6</td><td class="c s2">2.4</td><td class="c s2">2.6</td><td class="c s5">4.2</td><td class="c s2">2.4</td></tr>
+            <tr><td>인프라·에너지전환</td><td class="c s3">3.4</td><td class="c s4">3.8</td><td class="c s1">1.8</td><td class="c s2">2.8</td><td class="c s3">3.0</td><td class="c s4">3.6</td></tr>
+            <tr><td>디지털자산</td><td class="c s5">4.3</td><td class="c s1">2.0</td><td class="c s4">3.8</td><td class="c s2">2.5</td><td class="c s4">3.5</td><td class="c s2">2.3</td></tr>
+            <tr><td>보험·연금</td><td class="c s2">2.7</td><td class="c s5">4.3</td><td class="c s1">2.0</td><td class="c s3">3.3</td><td class="c s4">3.7</td><td class="c s5">4.7</td></tr>
+            <tr><td>부동산·레저</td><td class="c s3">3.0</td><td class="c s3">3.3</td><td class="c s1">1.7</td><td class="c s3">3.0</td><td class="c s4">3.7</td><td class="c s2">2.7</td></tr>
+          </table>
+        </section>
+      </div>
+
+      <div class="colR">
+        <section class="sec">
+          <div class="sh"><h3>분류별 등급 분포</h3><span>딜별 합의 등급</span></div>
+          <div class="dist">
+            <div class="dr"><span class="nm">크레딧·구조화</span><div class="bar"><i style="flex:1;background:var(--gA)"></i><i style="flex:1;background:var(--gBp)"></i><i style="flex:1;background:var(--gB)"></i><i style="flex:3;background:var(--gN)"></i></div><span class="ct">6</span></div>
+            <div class="dr"><span class="nm">패션자산·IP</span><div class="bar" style="width:83%"><i style="flex:1;background:var(--gBp)"></i><i style="flex:1;background:var(--gB)"></i><i style="flex:3;background:var(--gN)"></i></div><span class="ct">5</span></div>
+            <div class="dr"><span class="nm">인프라·에너지전환</span><div class="bar" style="width:83%"><i style="flex:5;background:var(--gN)"></i></div><span class="ct">5</span></div>
+            <div class="dr"><span class="nm">디지털자산</span><div class="bar" style="width:67%"><i style="flex:2;background:var(--gBp)"></i><i style="flex:2;background:var(--gN)"></i></div><span class="ct">4</span></div>
+            <div class="dr"><span class="nm">부동산·레저</span><div class="bar" style="width:50%"><i style="flex:1;background:var(--gC)"></i><i style="flex:2;background:var(--gN)"></i></div><span class="ct">3</span></div>
+            <div class="dr"><span class="nm">보험·연금</span><div class="bar" style="width:50%"><i style="flex:1;background:var(--gBp)"></i><i style="flex:1;background:var(--gB)"></i><i style="flex:1;background:var(--gN)"></i></div><span class="ct">3</span></div>
+            <div class="dr"><span class="nm">리퀴드 얼터너티브</span><div class="bar" style="width:50%"><i style="flex:1;background:var(--gBp)"></i><i style="flex:2;background:var(--gC)"></i></div><span class="ct">3</span></div>
+            <div class="dr"><span class="nm">WM 솔루션·플랫폼</span><div class="bar" style="width:50%"><i style="flex:3;background:var(--gN)"></i></div><span class="ct">3</span></div>
+            <div class="dr"><span class="nm">실물자산·원자재</span><div class="bar" style="width:33%"><i style="flex:1;background:var(--gBp)"></i><i style="flex:1;background:var(--gN)"></i></div><span class="ct">2</span></div>
+            <div class="dr"><span class="nm">사모시장·GP</span><div class="bar" style="width:17%"><i style="flex:1;background:var(--gC)"></i></div><span class="ct">1</span></div>
+          </div>
+        </section>
+
+        <section class="sec">
+          <div class="sh"><h3>최근 활동</h3></div>
+          <div class="act">
+            <div class="ai"><span class="k">답변</span><time>43분 전</time><p><b>김대원</b> ABF 에버그린 펀드</p><q>실제로 그것은 중요합니다.</q></div>
+            <div class="ai"><span class="k">질문</span><time>1시간 전</time><p><b>기정현</b> ABF 에버그린 펀드</p><q>아직 좀 잘 모르겠습니다</q></div>
+            <div class="ai"><span class="k">등록</span><time>2시간 전</time><p><b>기정현</b> 신규 딜 1건 심사 요청</p></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

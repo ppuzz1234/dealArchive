@@ -35,6 +35,11 @@ export function AppProvider({ children }) {
 
   const reloadUsers = useCallback(async () => setUsers(await api.users()), []);
 
+  // 일정(딜소싱 마감일·심사일) — 딜이 등록되면 회차별 등록 현황이 바뀌므로 딜 목록과 함께 갱신
+  const [schedule, setSchedule] = useState([]);
+  const reloadSchedule = useCallback(async () => setSchedule(await api.schedule()), []);
+  useEffect(() => { reloadSchedule().catch(() => {}); }, [deals, reloadSchedule]);
+
   useEffect(() => {
     Promise.all([api.meta(), api.users()])
       .then(([m, u]) => { setMeta(m); setUsers(u); })
@@ -68,8 +73,8 @@ export function AppProvider({ children }) {
   }, [userId, toast]);
 
   const value = useMemo(() => ({
-    meta, users, deals, me, userId, setUserId, reloadDeals, reloadUsers, toast, run, theme, setTheme, error,
-  }), [meta, users, deals, me, userId, reloadDeals, reloadUsers, toast, run, theme, error]);
+    meta, users, deals, schedule, me, userId, setUserId, reloadDeals, reloadUsers, reloadSchedule, toast, run, theme, setTheme, error,
+  }), [meta, users, deals, schedule, me, userId, reloadDeals, reloadUsers, reloadSchedule, toast, run, theme, error]);
 
   return (
     <Ctx.Provider value={value}>

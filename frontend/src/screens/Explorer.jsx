@@ -1,6 +1,6 @@
 /* 딜 아카이브 탐색기 — 대분류 › 소분류 › 개별 딜 드릴다운.
    상태는 URL 쿼리(cat, sub, q, grade, region, owner, status, view, sort)에 두어 공유·뒤로가기가 그대로 동작한다. */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../context.jsx";
 import { GRADE_IDS, catName, consensus, fmtDate, matchesSearch, metricAverages, scoreToGrade, avg } from "../lib.js";
@@ -121,7 +121,7 @@ export default function Explorer() {
                       <td>{d.owner_name}</td>
                       <td>{d.region || "-"}</td>
                       <td><Grade g={consensus(d)} /></td>
-                      <td><Grade g={d.owner_grade} /></td>
+                      <td><Grade g={d.owner_grade} hidden={d.self_hidden} /></td>
                       <td className="num">{d.vote_count}</td>
                       <td className="num">{d.question_count}{d.open_questions ? ` (${d.open_questions})` : ""}</td>
                       <td className="muted">{fmtDate(d.review_date)}</td>
@@ -140,27 +140,40 @@ export default function Explorer() {
 function CategoryTree({ meta, deals, cat, sub, onPick }) {
   const [openSet, setOpenSet] = useState(() => new Set(cat ? [cat] : []));
   const toggle = (id) => setOpenSet((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  // 트리맵·경로 등 트리 밖에서 분류가 바뀌면 해당 대분류를 펼친다 (이후 접기는 사용자가 자유롭게)
+  useEffect(() => { if (cat) setOpenSet((s) => (s.has(cat) ? s : new Set(s).add(cat))); }, [cat]);
+  // 대분류 행: 다른 분류면 선택하며 펼치고, 이미 선택된 분류를 다시 누르면 접기/펼치기
+  const pickCat = (id) => {
+    if (cat === id && !sub) return toggle(id);
+    onPick(id, "");
+    setOpenSet((s) => new Set(s).add(id));
+  };
   return (
     <nav className="card tree" aria-label="분류 체계">
       <button className={!cat ? "on" : ""} onClick={() => onPick("", "")}>전체<span className="n">{deals.length}</span></button>
       {meta.categories.map((c) => {
         const n = deals.filter((d) => d.category === c.id).length;
-        const isOpen = openSet.has(c.id) || cat === c.id;
+        const isOpen = openSet.has(c.id);
         return (
           <div key={c.id}>
-            <button className={cat === c.id && !sub ? "on" : ""} onClick={() => { onPick(c.id, ""); setOpenSet((s) => new Set(s).add(c.id)); }}
+            <button className={cat === c.id && !sub ? "on" : ""} onClick={() => pickCat(c.id)}
               aria-expanded={isOpen}>
               <span className={`caret ${isOpen ? "open" : ""}`} onClick={(e) => { e.stopPropagation(); toggle(c.id); }}><Icon name="chevron" width={14} /></span>
               {c.name}<span className="n">{n}</span>
             </button>
-            {isOpen && c.subs.map((s) => {
-              const sn = deals.filter((d) => d.category === c.id && d.subcategory === s.id).length;
-              return (
-                <button key={s.id} className={`sub ${sub === s.id ? "on" : ""}`} onClick={() => onPick(c.id, s.id)}>
-                  {s.name}<span className="n">{sn}</span>
-                </button>
-              );
-            })}
+            {/* 항상 렌더링하고 높이만 전환 — 접고 펼 때 부드럽게 움직인다 */}
+            <div className={`subs ${isOpen ? "open" : ""}`}>
+              <div>
+                {c.subs.map((s) => {
+                  const sn = deals.filter((d) => d.category === c.id && d.subcategory === s.id).length;
+                  return (
+                    <button key={s.id} className={`sub ${sub === s.id ? "on" : ""}`} onClick={() => onPick(c.id, s.id)}>
+                      {s.name}<span className="n">{sn}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         );
       })}

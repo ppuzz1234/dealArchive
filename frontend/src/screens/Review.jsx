@@ -54,7 +54,7 @@ export default function Review() {
               <div style={{ fontWeight: 700 }} className="ellipsis">{d.name}</div>
               <div className="muted" style={{ fontSize: 12 }}>{catName(meta, d.category)} › {catName(meta, d.category, d.subcategory)} · {d.owner_name} · {fmtDate(d.created_at)}</div>
             </div>
-            <div><Grade g={d.owner_grade} /></div>
+            <div><Grade g={d.owner_grade} hidden={d.self_hidden} /></div>
             <div>
               <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>{d.vote_count} / {voters}명</div>
               <div style={{ height: 8, borderRadius: 99, background: "color-mix(in srgb, var(--s1) 18%, var(--panel-2))" }}

@@ -4,7 +4,9 @@ import { METRICS } from "../taxonomy.js";
 
 const MAX_DIST = Math.sqrt(METRICS.length * 16); // 각 지표 1~5 → 최대 차 4
 
-function metricSimilarity(a = {}, b = {}) {
+function metricSimilarity(a, b) {
+  a = a || {};
+  b = b || {};
   const keys = METRICS.map((m) => m.id).filter((k) => a[k] != null && b[k] != null);
   if (keys.length < 3) return null;
   const d = Math.sqrt(keys.reduce((s, k) => s + (a[k] - b[k]) ** 2, 0) * (METRICS.length / keys.length));

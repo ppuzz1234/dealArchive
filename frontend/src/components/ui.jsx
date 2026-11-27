@@ -4,36 +4,30 @@ import { Link } from "react-router-dom";
 import { useApp } from "../context.jsx";
 import { catName, consensus, gradeClass, fmtDate } from "../lib.js";
 import { Radar } from "./charts.jsx";
+import {
+  CalendarCheck, CaretLeft, CaretRight, ChartPieSlice, ChatCircleText, FileText, Gavel, Handshake, IdentificationBadge,
+  LinkSimple, List, MagnifyingGlass, Moon, Newspaper, Paperclip, PencilSimple, Sun, Trash, Vault,
+} from "@phosphor-icons/react";
 
-const P = {
-  dash: "M3 13h8V3H3v10Zm0 8h8v-6H3v6Zm10 0h8V11h-8v10Zm0-18v6h8V3h-8Z",
-  archive: "M4 4h16v4H4zM5 8h14v12H5zM10 12h4",
-  vote: "M9 11l3 3 8-8M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11",
-  plus: "M12 5v14M5 12h14",
-  globe: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-9 9h18M12 3c2.5 2.5 3.8 5.5 3.8 9S14.5 18.5 12 21c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3Z",
-  users: "M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M9 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM22 19v-1a4 4 0 0 0-3-3.9M16 3.1a3.5 3.5 0 0 1 0 6.8",
-  search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm10 2-4.3-4.3",
-  menu: "M4 6h16M4 12h16M4 18h16",
-  chevron: "M9 6l6 6-6 6",
-  edit: "M4 20h4L19 9l-4-4L4 16v4Z",
-  trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
-  file: "M14 3H6v18h12V7l-4-4Zm0 0v4h4",
-  sun: "M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4",
-  moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z",
-  back: "M15 18l-6-6 6-6",
-  link: "M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1",
-  msg: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10Z",
-  clip: "M21 11l-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7",
+/* 아이콘 — Phosphor. 화면 코드는 이름으로만 쓰고, 어떤 그림인지는 여기서만 정한다.
+   메뉴 아이콘은 딜/금융 성격의 세트(원형 차트 · 금고 · 의사봉 · 악수 · 신문 · 사원증 · 달력 체크). */
+const ICONS = {
+  dash: ChartPieSlice, archive: Vault, vote: Gavel, plus: Handshake, globe: Newspaper, users: IdentificationBadge, cal: CalendarCheck,
+  search: MagnifyingGlass, menu: List, chevron: CaretRight, back: CaretLeft, edit: PencilSimple, trash: Trash,
+  file: FileText, sun: Sun, moon: Moon, link: LinkSimple, msg: ChatCircleText, clip: Paperclip,
 };
 
-export const Icon = ({ name, ...p }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
-    <path d={P[name]} />
-  </svg>
-);
+/* width: 한 변 크기(px). weight: regular | fill | bold … (선택된 메뉴는 fill) */
+export const Icon = ({ name, width = 18, weight = "regular", ...p }) => {
+  const Cmp = ICONS[name];
+  return Cmp ? <Cmp size={width} weight={weight} aria-hidden="true" {...p} /> : null;
+};
 
-export const Grade = ({ g, lg, title }) => (
-  <span className={`grade ${gradeClass(g)} ${lg ? "lg" : ""}`} title={title}>{g || "TBD"}</span>
+/* hidden: 아직 공개되지 않은 담당자 자가 등급 — '?' 로 표시 */
+export const Grade = ({ g, lg, title, hidden }) => (
+  <span className={`grade ${gradeClass(hidden ? null : g)} ${lg ? "lg" : ""}`}
+    title={hidden ? "다른 담당자 3명 이상이 투표하면 공개됩니다" : title}
+    aria-label={hidden ? "비공개" : undefined}>{hidden ? "?" : g || "TBD"}</span>
 );
 
 export const Avatar = ({ name }) => <span className="avatar" aria-hidden="true">{(name || "?").slice(-2)}</span>;

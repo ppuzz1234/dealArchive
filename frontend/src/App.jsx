@@ -8,6 +8,7 @@ import DealForm from "./screens/DealForm.jsx";
 import Review from "./screens/Review.jsx";
 import Feed from "./screens/Feed.jsx";
 import People from "./screens/People.jsx";
+import Admin from "./screens/Admin.jsx";
 import { Empty } from "./components/ui.jsx";
 
 function Routed() {
@@ -30,6 +31,7 @@ function Routed() {
         <Route path="review" element={<Review />} />
         <Route path="feed" element={<Feed />} />
         <Route path="people" element={<People />} />
+        <Route path="admin" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

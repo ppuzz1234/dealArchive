@@ -1,37 +1,62 @@
 /* 앱 셸 — 사이드바 내비 · 상단 검색 · 담당자 선택(로그인 전 단계) · 테마 */
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useApp } from "../context.jsx";
 import { api } from "../api.js";
+import { SCHEDULE_KINDS, ddayOf, fmtDday, fmtMD, parseYmd, sourcingNudge, upcomingEvent } from "../lib.js";
 import { Avatar, Icon } from "./ui.jsx";
 
 export default function Shell() {
-  const { deals, me, userId } = useApp();
+  const { deals, schedule, me, userId } = useApp();
   const [open, setOpen] = useState(false);
   const loc = useLocation();
   useEffect(() => setOpen(false), [loc.pathname]);
 
   const review = deals?.filter((d) => d.status === "review") || [];
   const pending = userId ? review.filter((d) => !d.my_grade).length : 0;
+  const nudge = sourcingNudge(schedule, userId);
 
   return (
     <div className="shell">
       <aside className={`sidebar ${open ? "open" : ""}`}>
-        <div className="brand">
+        <Link to="/" className="brand" aria-label="DealArchive 대시보드 홈">
           <div className="brand-mark">P</div>
           <div><div className="brand-name">DealArchive</div><div className="brand-sub">PLUS 소싱 매트릭스</div></div>
-        </div>
+        </Link>
         <nav className="nav" aria-label="주 메뉴">
-          <NavLink to="/" end><Icon name="dash" />대시보드</NavLink>
-          <NavLink to="/deals"><Icon name="archive" />딜 아카이브<span className="count">{deals?.length ?? "–"}</span></NavLink>
+          <NavItem to="/" end icon="dash">대시보드</NavItem>
+          <NavItem to="/deals" icon="archive">딜 아카이브<span className="count">{deals?.length ?? "–"}</span></NavItem>
           <div className="nav-label">신규 딜 심사</div>
-          <NavLink to="/review"><Icon name="vote" />심사 보드{pending > 0 && <span className="count" title="내 투표 대기">{pending}</span>}</NavLink>
-          <NavLink to="/new"><Icon name="plus" />딜 등록</NavLink>
+          <NavItem to="/review" icon="vote">심사 보드{pending > 0 && <span className="count" title="내 투표 대기">{pending}</span>}</NavItem>
+          <NavItem to="/new" icon="plus" className={nudge ? "nudge" : ""}
+            title={nudge ? `딜소싱 마감 ${fmtMD(nudge.date)}: 이번 회차에 아직 딜을 등록하지 않았습니다` : undefined}>
+            딜 등록{nudge && <span className="dday urgent">{fmtDday(nudge.dday)}</span>}
+          </NavItem>
           <div className="nav-label">인사이트</div>
-          <NavLink to="/feed"><Icon name="globe" />글로벌 딜 피드</NavLink>
-          <NavLink to="/people"><Icon name="users" />담당자</NavLink>
+          <NavItem to="/feed" icon="globe">글로벌 딜 피드</NavItem>
+          <NavItem to="/people" icon="users">담당자</NavItem>
+          <div className="nav-label">관리</div>
+          <NavItem to="/admin" icon="cal">관리자 · 일정</NavItem>
         </nav>
-        <div className="sidebar-foot">{me ? `${me.name}님으로 작업 중` : "담당자를 선택하세요"}</div>
+        <div className="side-sched" aria-label="다가오는 일정">
+          <h6>다가오는 일정</h6>
+          {Object.entries(SCHEDULE_KINDS).map(([kind, label]) => {
+            const e = upcomingEvent(schedule, kind);
+            const n = e ? ddayOf(e.date) : null;
+            const d = e ? parseYmd(e.date) : null;
+            const hot = e && n <= 1;
+            return (
+              <Link to="/admin" key={kind} className="sched-row" title={e?.note || undefined}>
+                <span className={`cal-chip ${hot ? "hot" : ""}`} aria-hidden="true">
+                  {d ? <><small>{d.getMonth() + 1}월</small><b>{d.getDate()}</b></> : <b>–</b>}
+                </span>
+                <span className="txt"><span className="lbl">{label}</span><span className="dt">{d ? `${WEEKDAYS[d.getDay()]}요일` : "미정"}</span></span>
+                {e && <span className={`dday ${hot ? "urgent" : ""}`}>{fmtDday(n)}</span>}
+              </Link>
+            );
+          })}
+        </div>
+        <div className="sidebar-foot">{me ? <><Avatar name={me.name} />{me.name}님으로 작업 중</> : "담당자를 선택하세요"}</div>
       </aside>
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
       <div className="main">
@@ -41,6 +66,17 @@ export default function Shell() {
     </div>
   );
 }
+
+/* 메뉴 한 줄 — 현재 위치는 채움(fill) 아이콘, 나머지는 선(regular) 아이콘 */
+function NavItem({ to, end, icon, className = "", title, children }) {
+  return (
+    <NavLink to={to} end={end} title={title} className={({ isActive }) => `${isActive ? "active" : ""} ${className}`}>
+      {({ isActive }) => <><Icon name={icon} weight={isActive ? "fill" : "regular"} />{children}</>}
+    </NavLink>
+  );
+}
+
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 function Topbar({ onMenu }) {
   const nav = useNavigate();
