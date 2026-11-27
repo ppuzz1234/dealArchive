@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dealarchive
+      POSTGRES_PASSWORD: dealarchive
+      POSTGRES_DB: dealarchive
+    ports:
+      - "5432:5432"
+    volumes:
+      - dealarchive_db_data:/var/lib/postgresql/data
+
+volumes:
+  dealarchive_db_data:

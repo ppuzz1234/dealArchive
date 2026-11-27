@@ -1,0 +1,37 @@
+# 백엔드 자동 배포 1단계 — main에 push되면 Docker 이미지를 빌드해 ghcr.io에 업로드.
+# 2단계(NAS의 Watchtower가 새 이미지를 감지해 자동 교체)는 deploy/nas/docker-compose.yml 참고.
+name: deploy-backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # ghcr.io 업로드 권한 (기본 GITHUB_TOKEN 사용 — 별도 시크릿 불필요)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ghcr.io 이미지 이름은 소문자만 허용 (저장소명 DealArchive → dealarchive)
+      - name: Set lowercase image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}-backend" >> "$GITHUB_ENV"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}

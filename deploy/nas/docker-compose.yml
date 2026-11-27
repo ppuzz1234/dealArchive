@@ -1,0 +1,29 @@
+# 시놀로지 NAS 배포용 — 백엔드 + Cloudflare Tunnel + 자동 업데이트(Watchtower)
+# 사용법: deploy/nas/README.md 참고
+#
+# 배포 흐름: main push → GitHub Actions가 이미지 빌드·업로드(ghcr.io)
+#           → Watchtower가 2분 간격으로 감지 → 백엔드 컨테이너 자동 교체
+services:
+  backend:
+    image: ghcr.io/ppuzz1234/dealarchive-backend:latest
+    restart: unless-stopped            # NAS 재부팅/장애 시 자동 재시작
+    env_file: ./backend.env            # 비밀값 — backend.env.example 복사 후 작성
+    ports:
+      - "4700:4700"                    # LAN에서 직접 확인용(선택). 외부 노출은 Tunnel이 담당
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}   # 같은 폴더의 .env 파일에서 읽음
+    depends_on:
+      - backend
+
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/config.json:ro  # ghcr 로그인 정보 (README 3-2단계)
+    command: --interval 120 --cleanup  # 2분마다 새 이미지 확인, 구버전 이미지 정리
